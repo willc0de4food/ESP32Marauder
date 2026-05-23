@@ -922,6 +922,12 @@ class WiFiScan
     void tagPOI(const char* label = nullptr);
 
     bool save_serial = false;
+    // One-shot flag — set true by "Sniff + GPS" menu entries (or `sniffXxx -g` CLI)
+    // before calling StartScan(). startPcap() reads this and routes through
+    // Buffer::pcapOpenPPI() instead of pcapOpen(), giving the resulting .pcap a
+    // DLT-192 (PPI) link type with per-frame GPS tags. Reset to false inside
+    // startPcap() so a subsequent non-GPS sniff doesn't accidentally inherit it.
+    bool gps_log_for_next_sniff = false;
     void startPcap(String file_name);
     void startLog(String file_name);
     void startGPX(String file_name);

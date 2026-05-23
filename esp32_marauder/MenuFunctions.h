@@ -160,6 +160,10 @@ class MenuFunctions
 
     // WiFi menu stuff
     Menu wifiSnifferMenu;
+    // Parallel sniffer menu — mirrors every entry in wifiSnifferMenu, but each
+    // entry sets wifi_scan_obj.gps_log_for_next_sniff = true before calling
+    // StartScan(). The resulting pcap has DLT 192 (PPI) with per-frame GPS tags.
+    Menu wifiSnifferGpsMenu;
     Menu wifiScannerMenu;
     Menu wifiAttackMenu;
     /*#ifdef HAS_GPS
