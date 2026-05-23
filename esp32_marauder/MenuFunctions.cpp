@@ -1502,7 +1502,9 @@ void MenuFunctions::RunSetup()
   infoMenu.list = new LinkedList<MenuNode>();
   // WiFi menu stuff
   wifiSnifferMenu.list = new LinkedList<MenuNode>();
-  wifiSnifferGpsMenu.list = new LinkedList<MenuNode>();
+  #ifdef HAS_GPS
+    wifiSnifferGpsMenu.list = new LinkedList<MenuNode>();
+  #endif
   wifiScannerMenu.list = new LinkedList<MenuNode>();
   wifiAttackMenu.list = new LinkedList<MenuNode>();
   /*#ifdef HAS_GPS
@@ -1559,7 +1561,9 @@ void MenuFunctions::RunSetup()
   settingsMenu.name = text_table1[18];
   bluetoothMenu.name = text_table1[19];
   wifiSnifferMenu.name = text_table1[20];
-  wifiSnifferGpsMenu.name = "Sniff + GPS";
+  #ifdef HAS_GPS
+    wifiSnifferGpsMenu.name = "Sniff + GPS";
+  #endif
   wifiScannerMenu.name = "Scanners";
   wifiAttackMenu.name = text_table1[21];
   wifiGeneralMenu.name = text_table1[22];
@@ -1632,9 +1636,11 @@ void MenuFunctions::RunSetup()
   this->addNodes(&wifiMenu, text_table1[31], TFTYELLOW, NULL, SNIFFERS, [this]() {
     this->changeMenu(&wifiSnifferMenu, true);
   });
-  this->addNodes(&wifiMenu, "Sniff + GPS", TFTLIME, NULL, SNIFFERS, [this]() {
-    this->changeMenu(&wifiSnifferGpsMenu, true);
-  });
+  #ifdef HAS_GPS
+    this->addNodes(&wifiMenu, "Sniff + GPS", TFTLIME, NULL, SNIFFERS, [this]() {
+      this->changeMenu(&wifiSnifferGpsMenu, true);
+    });
+  #endif
   this->addNodes(&wifiMenu, "Scanners", TFTORANGE, NULL, SCANNERS, [this]() {
     this->changeMenu(&wifiScannerMenu, true);
   });
@@ -1834,6 +1840,7 @@ void MenuFunctions::RunSetup()
   // Channel Analyzer, etc.) don't write a pcap so they can't carry PPI tags.
   // The flag is one-shot — consumed and cleared inside WiFiScan::startPcap().
   // ---------------------------------------------------------------------------
+  #ifdef HAS_GPS
   wifiSnifferGpsMenu.parentMenu = &wifiMenu;
   this->addNodes(&wifiSnifferGpsMenu, text09, TFTLIGHTGREY, NULL, 0, [this]() {
     this->changeMenu(wifiSnifferGpsMenu.parentMenu, true);
@@ -1910,6 +1917,7 @@ void MenuFunctions::RunSetup()
     wifi_scan_obj.gps_log_for_next_sniff = true;
     wifi_scan_obj.StartScan(WIFI_SCAN_SAE_COMMIT, TFT_GREEN);
   });
+  #endif
 
   // Build Wardriving menu
   #ifdef HAS_GPS

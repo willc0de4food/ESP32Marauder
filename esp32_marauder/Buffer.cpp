@@ -2,7 +2,9 @@
 #include "lang_var.h"
 #include "GpsInterface.h"
 
+#ifdef HAS_GPS
 extern GpsInterface gps_obj;
+#endif
 
 // PPI (Per-Packet Information) constants — see CACE/Riverbed spec and Wireshark PPI dissector.
 // We emit a PPI fixed header (8 bytes) followed by a single PPI Geolocation field
@@ -148,6 +150,7 @@ void Buffer::writePpiHeader(uint32_t /*frame_len*/) {
   uint32_t lon_fixed = 0;
   uint32_t alt_fixed = 0;
 
+#ifdef HAS_GPS
   if (gps_obj.getGpsModuleStatus() && gps_obj.getFixStatus()) {
     // gps_obj caches lat/lon as int32 in millionths of a degree (1e6 scale)
     // — the PPI fixed-point format wants 1e7 scale and a +180 degree offset.
@@ -158,6 +161,7 @@ void Buffer::writePpiHeader(uint32_t /*frame_len*/) {
     lon_fixed = (uint32_t)((lon_deg + 180.0) * 1e7);
     alt_fixed = (uint32_t)((alt_m + 180000.0) * 1e4);
   }
+#endif
   write(lat_fixed);
   write(lon_fixed);
   write(alt_fixed);
