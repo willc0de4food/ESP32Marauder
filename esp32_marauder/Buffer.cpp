@@ -120,7 +120,7 @@ void Buffer::pcapOpenPPI(String file_name, fs::FS* fs, bool serial) {
 // PPI fixed-point encoding (per the PPI Geolocation spec):
 //   lat = (degrees + 180.0) * 1e7   (uint32, LE)
 //   lon = (degrees + 180.0) * 1e7
-//   alt = (meters  + 180000.0) * 1e3
+//   alt = (meters  + 180000.0) * 1e4   (fixed6_4 format — wireshark's `ppi_gps.alt`)
 // We always emit lat/lon/alt fields. If there's no GPS fix, we emit zeros for
 // lat/lon (= -180 degrees, an unambiguous sentinel that post-processors can
 // filter on) so the pcap still parses cleanly.
@@ -156,7 +156,7 @@ void Buffer::writePpiHeader(uint32_t /*frame_len*/) {
     double alt_m   = (double)gps_obj.getAlt();
     lat_fixed = (uint32_t)((lat_deg + 180.0) * 1e7);
     lon_fixed = (uint32_t)((lon_deg + 180.0) * 1e7);
-    alt_fixed = (uint32_t)((alt_m + 180000.0) * 1e3);
+    alt_fixed = (uint32_t)((alt_m + 180000.0) * 1e4);
   }
   write(lat_fixed);
   write(lon_fixed);
