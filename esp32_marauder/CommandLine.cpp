@@ -217,7 +217,20 @@ void CommandLine::runCommand(String input) {
     Serial.println("#" + input);
 
   LinkedList<String> cmd_args = this->parseCommand(input, " ");
-  
+
+  // -g / --gps flag — when present on any sniff* command, the next pcap-producing
+  // sniff opens its file as DLT 192 (PPI) with per-frame GPS tags instead of the
+  // default DLT 105 (raw 802.11). This is the headless equivalent of the
+  // "Sniff + GPS" menu (which only exists on boards with HAS_SCREEN). The flag
+  // is one-shot — consumed and cleared in WiFiScan::startPcap().
+  // Examples: `sniffraw -g`, `sniffbeacon --gps`, `sniffprobe -g`.
+  for (int i = 1; i < cmd_args.size(); i++) {
+    if (cmd_args.get(i) == "-g" || cmd_args.get(i) == "--gps") {
+      wifi_scan_obj.gps_log_for_next_sniff = true;
+      break;
+    }
+  }
+
   //// Admin commands
   // Help
   if (cmd_args.get(0) == HELP_CMD) {

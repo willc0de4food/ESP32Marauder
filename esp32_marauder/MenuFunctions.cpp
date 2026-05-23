@@ -1502,6 +1502,7 @@ void MenuFunctions::RunSetup()
   infoMenu.list = new LinkedList<MenuNode>();
   // WiFi menu stuff
   wifiSnifferMenu.list = new LinkedList<MenuNode>();
+  wifiSnifferGpsMenu.list = new LinkedList<MenuNode>();
   wifiScannerMenu.list = new LinkedList<MenuNode>();
   wifiAttackMenu.list = new LinkedList<MenuNode>();
   /*#ifdef HAS_GPS
@@ -1558,6 +1559,7 @@ void MenuFunctions::RunSetup()
   settingsMenu.name = text_table1[18];
   bluetoothMenu.name = text_table1[19];
   wifiSnifferMenu.name = text_table1[20];
+  wifiSnifferGpsMenu.name = "Sniff + GPS";
   wifiScannerMenu.name = "Scanners";
   wifiAttackMenu.name = text_table1[21];
   wifiGeneralMenu.name = text_table1[22];
@@ -1629,6 +1631,9 @@ void MenuFunctions::RunSetup()
   });
   this->addNodes(&wifiMenu, text_table1[31], TFTYELLOW, NULL, SNIFFERS, [this]() {
     this->changeMenu(&wifiSnifferMenu, true);
+  });
+  this->addNodes(&wifiMenu, "Sniff + GPS", TFTLIME, NULL, SNIFFERS, [this]() {
+    this->changeMenu(&wifiSnifferGpsMenu, true);
   });
   this->addNodes(&wifiMenu, "Scanners", TFTORANGE, NULL, SCANNERS, [this]() {
     this->changeMenu(&wifiScannerMenu, true);
@@ -1819,6 +1824,90 @@ void MenuFunctions::RunSetup()
   this->addNodes(&wifiSnifferMenu, "SAE Commit", TFTLIME, NULL, EAPOL, [this]() {
     display_obj.clearScreen();
     this->drawStatusBar();
+    wifi_scan_obj.StartScan(WIFI_SCAN_SAE_COMMIT, TFT_GREEN);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Build "Sniff + GPS" menu — parallel to wifiSnifferMenu, but each entry
+  // sets gps_log_for_next_sniff=true before StartScan(). Only pcap-producing
+  // sniff types are mirrored here; visualization-only modes (Packet Count,
+  // Channel Analyzer, etc.) don't write a pcap so they can't carry PPI tags.
+  // The flag is one-shot — consumed and cleared inside WiFiScan::startPcap().
+  // ---------------------------------------------------------------------------
+  wifiSnifferGpsMenu.parentMenu = &wifiMenu;
+  this->addNodes(&wifiSnifferGpsMenu, text09, TFTLIGHTGREY, NULL, 0, [this]() {
+    this->changeMenu(wifiSnifferGpsMenu.parentMenu, true);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[42], TFTCYAN, NULL, PROBE_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_PROBE, TFT_CYAN);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[43], TFTMAGENTA, NULL, BEACON_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_AP, TFT_MAGENTA);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[44], TFTRED, NULL, DEAUTH_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_DEAUTH, TFT_RED);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[46], TFTVIOLET, NULL, EAPOL, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_EAPOL, TFT_VIOLET);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[58], TFTWHITE, NULL, PACKET_MONITOR, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_RAW_CAPTURE, TFT_WHITE);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[47], TFTRED, NULL, PWNAGOTCHI, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_PWN, TFT_RED);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[63], TFTYELLOW, NULL, PINESCAN_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_PINESCAN, TFT_YELLOW);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, text_table1[64], TFTORANGE, NULL, MULTISSID_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_MULTISSID, TFT_ORANGE);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, "Scan AP/STA", TFTLIME, NULL, BEACON_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_AP_STA, 0x97e0);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, "Fox Hunt", TFTCYAN, NULL, PACKET_MONITOR, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_SIG_STREN, TFT_CYAN);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, "MAC Monitor", TFTMAGENTA, NULL, SCANNERS, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(WIFI_SCAN_DETECT_FOLLOW, TFT_MAGENTA);
+  });
+  this->addNodes(&wifiSnifferGpsMenu, "SAE Commit", TFTLIME, NULL, EAPOL, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
     wifi_scan_obj.StartScan(WIFI_SCAN_SAE_COMMIT, TFT_GREEN);
   });
 

@@ -1,5 +1,28 @@
 #include "Buffer.h"
 #include "lang_var.h"
+#include "GpsInterface.h"
+
+extern GpsInterface gps_obj;
+
+// PPI (Per-Packet Information) constants — see CACE/Riverbed spec and Wireshark PPI dissector.
+// We emit a PPI fixed header (8 bytes) followed by a single PPI Geolocation field
+// (type 30002) with lat/lon/alt sub-fields, then the 802.11 frame as the encapsulated
+// payload. DLT switches from 105 (raw 802.11) to 192 (PPI) in the pcap global header.
+#define PPI_DLT                  192
+#define PPI_ORIGINAL_DLT_80211   105
+#define PPI_FIELD_TYPE_GEOLOC    30002
+// Geolocation "present" bitmask flags (bit positions per the PPI Geolocation spec):
+#define PPI_GEO_PRESENT_LAT      (1u << 1)
+#define PPI_GEO_PRESENT_LON      (1u << 2)
+#define PPI_GEO_PRESENT_ALT      (1u << 3)
+#define PPI_GEO_VERSION          2  // current Geolocation spec version
+// Sizes:
+//   PPI fixed header              = 8 bytes  (ver + flags + len + dlt)
+//   PPI field type/len header     = 4 bytes  (pfh_type + pfh_datalen)
+//   Geolocation sub-header        = 8 bytes  (geotag_ver + pad + len + present)
+//   Lat/Lon/Alt sub-fields        = 12 bytes (3 x uint32 fixed-point)
+//   Total PPI overhead per frame  = 32 bytes
+#define PPI_HEADER_TOTAL_LEN     32
 
 Buffer::Buffer(){
   bufA = (uint8_t*)malloc(BUF_SIZE);
@@ -42,13 +65,17 @@ void Buffer::open(bool is_pcap){
   writing = true;
 
   if (is_pcap) {
+    // PPI captures need extra room in SNAP_LEN for the per-frame PPI header
+    // (32 bytes — see PPI_HEADER_TOTAL_LEN above).
+    uint32_t snap = is_ppi ? (SNAP_LEN + PPI_HEADER_TOTAL_LEN) : SNAP_LEN;
+    uint32_t dlt  = is_ppi ? PPI_DLT : 105;
     write(uint32_t(0xa1b2c3d4)); // magic number
     write(uint16_t(2)); // major version number
     write(uint16_t(4)); // minor version number
     write(int32_t(0)); // GMT to local correction
     write(uint32_t(0)); // accuracy of timestamps
-    write(uint32_t(SNAP_LEN)); // max length of captured packets, in octets
-    write(uint32_t(105)); // data link type
+    write(snap); // max length of captured packets, in octets
+    write(dlt); // data link type
   }
 }
 
@@ -77,7 +104,63 @@ void Buffer::openFile(String file_name, fs::FS* fs, bool serial, bool is_pcap, b
 }
 
 void Buffer::pcapOpen(String file_name, fs::FS* fs, bool serial) {
+  is_ppi = false;
   openFile(file_name, fs, serial, true);
+}
+
+void Buffer::pcapOpenPPI(String file_name, fs::FS* fs, bool serial) {
+  is_ppi = true;
+  openFile(file_name, fs, serial, true);
+}
+
+// Build and write the PPI fixed header + a Geolocation field with the current
+// cached lat/lon/alt from gps_obj. Called once per packet (right after the
+// pcap per-frame timestamp header, right before the 802.11 payload).
+//
+// PPI fixed-point encoding (per the PPI Geolocation spec):
+//   lat = (degrees + 180.0) * 1e7   (uint32, LE)
+//   lon = (degrees + 180.0) * 1e7
+//   alt = (meters  + 180000.0) * 1e4   (fixed6_4 format — wireshark's `ppi_gps.alt`)
+// We always emit lat/lon/alt fields. If there's no GPS fix, we emit zeros for
+// lat/lon (= -180 degrees, an unambiguous sentinel that post-processors can
+// filter on) so the pcap still parses cleanly.
+void Buffer::writePpiHeader(uint32_t /*frame_len*/) {
+  // --- PPI fixed header (8 bytes) ---
+  write(uint8_t(0));                            // pph_version = 0
+  write(uint8_t(0));                            // pph_flags   = 0 (32-bit aligned)
+  write(uint16_t(PPI_HEADER_TOTAL_LEN));        // pph_len     = 32
+  write(uint32_t(PPI_ORIGINAL_DLT_80211));      // pph_dlt     = 105 (encapsulated frame is 802.11)
+
+  // --- PPI Geolocation field header (4 bytes) ---
+  write(uint16_t(PPI_FIELD_TYPE_GEOLOC));       // pfh_type    = 30002
+  write(uint16_t(20));                          // pfh_datalen = 20 (sub-header 8 + lat/lon/alt 12)
+
+  // --- Geolocation sub-header (8 bytes) ---
+  write(uint8_t(PPI_GEO_VERSION));              // geotag_ver
+  write(uint8_t(0));                            // geotag_pad
+  write(uint16_t(20));                          // geotag_len (this sub-tag including its own header)
+  write(uint32_t(PPI_GEO_PRESENT_LAT |
+                 PPI_GEO_PRESENT_LON |
+                 PPI_GEO_PRESENT_ALT));         // present bitmask
+
+  // --- Lat / Lon / Alt fixed-point fields (12 bytes) ---
+  uint32_t lat_fixed = 0;
+  uint32_t lon_fixed = 0;
+  uint32_t alt_fixed = 0;
+
+  if (gps_obj.getGpsModuleStatus() && gps_obj.getFixStatus()) {
+    // gps_obj caches lat/lon as int32 in millionths of a degree (1e6 scale)
+    // — the PPI fixed-point format wants 1e7 scale and a +180 degree offset.
+    double lat_deg = (double)gps_obj.getLatInt() / 1000000.0;
+    double lon_deg = (double)gps_obj.getLonInt() / 1000000.0;
+    double alt_m   = (double)gps_obj.getAlt();
+    lat_fixed = (uint32_t)((lat_deg + 180.0) * 1e7);
+    lon_fixed = (uint32_t)((lon_deg + 180.0) * 1e7);
+    alt_fixed = (uint32_t)((alt_m + 180000.0) * 1e4);
+  }
+  write(lat_fixed);
+  write(lon_fixed);
+  write(alt_fixed);
 }
 
 void Buffer::logOpen(String file_name, fs::FS* fs, bool serial) {
@@ -89,17 +172,22 @@ void Buffer::gpxOpen(String file_name, fs::FS* fs, bool serial) {
 }
 
 void Buffer::add(const uint8_t* buf, uint32_t len, bool is_pcap){
+  // PPI mode adds a fixed PPI_HEADER_TOTAL_LEN-byte header before each frame —
+  // account for it in the buffer-full and double-buffer-flip checks so we don't
+  // truncate frames mid-header.
+  uint32_t total_len = (is_pcap && is_ppi) ? (len + PPI_HEADER_TOTAL_LEN) : len;
+
   // buffer is full -> drop packet
-  if((useA && bufSizeA + len >= BUF_SIZE && bufSizeB > 0) || (!useA && bufSizeB + len >= BUF_SIZE && bufSizeA > 0)){
-    //Serial.print(";"); 
+  if((useA && bufSizeA + total_len >= BUF_SIZE && bufSizeB > 0) || (!useA && bufSizeB + total_len >= BUF_SIZE && bufSizeA > 0)){
+    //Serial.print(";");
     return;
   }
-  
-  if(useA && bufSizeA + len + 16 >= BUF_SIZE && bufSizeB == 0){
+
+  if(useA && bufSizeA + total_len + 16 >= BUF_SIZE && bufSizeB == 0){
     useA = false;
     //Serial.println("\nswitched to buffer B");
   }
-  else if(!useA && bufSizeB + len + 16 >= BUF_SIZE && bufSizeA == 0){
+  else if(!useA && bufSizeB + total_len + 16 >= BUF_SIZE && bufSizeA == 0){
     useA = true;
     //Serial.println("\nswitched to buffer A");
   }
@@ -108,15 +196,18 @@ void Buffer::add(const uint8_t* buf, uint32_t len, bool is_pcap){
   uint32_t seconds = (microSeconds/1000)/1000; // e.g. 45200400/1000/1000 = 45200 / 1000 = 45s
 
   microSeconds -= seconds*1000*1000; // e.g. 45200400 - 45*1000*1000 = 45200400 - 45000000 = 400us (because we only need the offset)
-  
+
   if (is_pcap) {
     write(seconds); // ts_sec
     write(microSeconds); // ts_usec
-    write(len); // incl_len
-    write(len); // orig_len
+    write(total_len); // incl_len (frame + optional PPI header)
+    write(total_len); // orig_len
+    if (is_ppi) {
+      writePpiHeader(len);
+    }
   }
-  
-  write(buf, len); // packet payload
+
+  write(buf, len); // packet payload (always the original 802.11 frame)
 }
 
 void Buffer::append(wifi_promiscuous_pkt_t *packet, int len) {
@@ -156,6 +247,10 @@ void Buffer::write(uint16_t n){
   buf[0] = n;
   buf[1] = n >> 8;
   write(buf,2);
+}
+
+void Buffer::write(uint8_t n){
+  write(&n, 1);
 }
 
 void Buffer::write(const uint8_t* buf, uint32_t len){

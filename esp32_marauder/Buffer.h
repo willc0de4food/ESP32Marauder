@@ -20,6 +20,12 @@ class Buffer {
   public:
     Buffer();
     void pcapOpen(String file_name, fs::FS* fs, bool serial);
+    // Open a pcap whose DLT is 192 (PPI). Each frame written via append() will be
+    // prefixed with a PPI fixed header + a PPI GPS geolocation tag that snapshots
+    // gps_obj's most recent lat/lon/alt. Frame is otherwise unchanged. The result
+    // is a single .pcap file that Wireshark/Kismet/hcxdumptool open natively
+    // with per-packet GPS coordinates.
+    void pcapOpenPPI(String file_name, fs::FS* fs, bool serial);
     void logOpen(String file_name, fs::FS* fs, bool serial);
     void gpxOpen(String file_name, fs::FS* fs, bool serial);
     void append(wifi_promiscuous_pkt_t *packet, int len);
@@ -31,13 +37,15 @@ class Buffer {
     void open(bool is_pcap);
     void openFile(String file_name, fs::FS* fs, bool serial, bool is_pcap, bool is_gpx = false);
     void add(const uint8_t* buf, uint32_t len, bool is_pcap);
+    void writePpiHeader(uint32_t frame_len);
     void write(int32_t n);
     void write(uint32_t n);
     void write(uint16_t n);
+    void write(uint8_t n);
     void write(const uint8_t* buf, uint32_t len);
     void saveFs();
     void saveSerial();
-    
+
     uint8_t* bufA;
     uint8_t* bufB;
 
@@ -47,6 +55,7 @@ class Buffer {
     bool writing = false; // acceppting writes to buffer
     bool useA = true; // writing to bufA or bufB
     bool saving = false; // currently saving onto the SD card
+    bool is_ppi = false; // when true, write DLT 192 + per-frame PPI GPS tag
 
     String fileName = "/0.pcap";
     File file;

@@ -2820,14 +2820,25 @@ String WiFiScan::security_int_to_string(int security_type) {
 }
 
 void WiFiScan::startPcap(String file_name) {
-  buffer_obj.pcapOpen(
-    file_name,
+  // If the menu entry / CLI flag set gps_log_for_next_sniff, route to the
+  // PPI-mode pcap (DLT 192 + per-frame GPS tags). One-shot: cleared here so
+  // it doesn't bleed into the next non-GPS sniff.
+  bool use_ppi = gps_log_for_next_sniff;
+  gps_log_for_next_sniff = false;
+
+  fs::FS* fs_ptr =
     #if defined(HAS_SD)
       sd_obj.supported ? &SD :
     #endif
-    NULL,
-    save_serial // Set with commandline options
-  );
+    NULL;
+
+  if (use_ppi) {
+    // Append "_gps" to the filename so the user (and any post-processor) can
+    // tell at a glance which pcap files carry PPI GPS data.
+    buffer_obj.pcapOpenPPI(file_name + F("_gps"), fs_ptr, save_serial);
+  } else {
+    buffer_obj.pcapOpen(file_name, fs_ptr, save_serial);
+  }
 }
 
 void WiFiScan::startLog(String file_name) {
