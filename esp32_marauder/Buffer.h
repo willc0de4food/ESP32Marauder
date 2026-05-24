@@ -36,8 +36,9 @@ class Buffer {
     void createFile(String name, bool is_pcap, bool is_gpx = false);
     void open(bool is_pcap);
     void openFile(String file_name, fs::FS* fs, bool serial, bool is_pcap, bool is_gpx = false);
-    void add(const uint8_t* buf, uint32_t len, bool is_pcap);
-    void writePpiHeader(uint32_t frame_len);
+    void add(const uint8_t* buf, uint32_t len, bool is_pcap,
+             int8_t rssi_dbm = 0, uint8_t channel = 0);
+    void writePpiHeader(uint32_t frame_len, int8_t rssi_dbm, uint8_t channel);
     void write(int32_t n);
     void write(uint32_t n);
     void write(uint16_t n);
