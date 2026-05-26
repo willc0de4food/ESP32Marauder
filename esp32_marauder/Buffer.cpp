@@ -236,10 +236,20 @@ void Buffer::add(const uint8_t* buf, uint32_t len, bool is_pcap,
     //Serial.println("\nswitched to buffer A");
   }
 
-  uint32_t microSeconds = micros(); // e.g. 45200400 => 45s 200ms 400us
-  uint32_t seconds = (microSeconds/1000)/1000; // e.g. 45200400/1000/1000 = 45200 / 1000 = 45s
+  // 64-bit overflow-safe micros(). Plain micros() wraps at uint32_t max =
+  // ~71.6 min of device uptime, which caused pcap timestamps to roll backward
+  // mid-capture for any session that crossed the wraparound boundary (boot
+  // uptime + capture duration > 4294s). Track the high word locally so we
+  // get monotonic timestamps for ~584,000 years.
+  static uint32_t micros_high = 0;
+  static uint32_t micros_last_low = 0;
+  uint32_t now_low = micros();
+  if (now_low < micros_last_low) micros_high++;
+  micros_last_low = now_low;
+  uint64_t totalMicros = ((uint64_t)micros_high << 32) | now_low;
 
-  microSeconds -= seconds*1000*1000; // e.g. 45200400 - 45*1000*1000 = 45200400 - 45000000 = 400us (because we only need the offset)
+  uint32_t seconds = (uint32_t)(totalMicros / 1000000ULL);
+  uint32_t microSeconds = (uint32_t)(totalMicros % 1000000ULL);
 
   if (is_pcap) {
     write(seconds); // ts_sec
