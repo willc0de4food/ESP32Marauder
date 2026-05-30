@@ -2238,6 +2238,19 @@ bool WiFiScan::shutdownBLE() {
 
 // Function to stop all wifi scans
 void WiFiScan::StopScan(uint8_t scan_mode) {
+  // Flush any buffered capture data and fully drain the UART TX FIFO BEFORE
+  // we run teardown (shutdownWiFi, status prints, etc.). When a sniff is
+  // streaming a pcap over serial (sniffraw -g and friends), each flush is
+  // wrapped in [BUF/BEGIN]..[BUF/CLOSE] markers that the Flipper companion
+  // uses to demux pcap bytes from console text. If teardown text were printed
+  // while a final blob was still mid-transmission, the companion would splice
+  // that text into the .pcap and corrupt the tail record. Saving + flushing
+  // here guarantees the serial pcap stream always ends on a clean [BUF/CLOSE]
+  // boundary. save() is a no-op when the buffer is empty, so this is harmless
+  // for non-capture stops.
+  buffer_obj.save();
+  Serial.flush();
+
   if ((currentScanMode == WIFI_SCAN_PROBE) ||
   (currentScanMode == WIFI_SCAN_SAE_COMMIT) ||
   (currentScanMode == WIFI_SCAN_AP) ||
