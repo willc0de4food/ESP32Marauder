@@ -68,7 +68,7 @@ void LedInterface::setColor(int r, int g, int b) {
 void LedInterface::extSetup() {
   #ifdef EXT_NEOPIXEL_PIN
     ext_strip.begin();
-    ext_strip.setBrightness(50);
+    ext_strip.setBrightness(77); // ~30%
     ext_strip.clear();
     ext_strip.show();
   #endif
