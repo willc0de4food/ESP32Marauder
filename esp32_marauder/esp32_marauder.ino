@@ -112,6 +112,10 @@ const String PROGMEM version_number = MARAUDER_VERSION;
   Adafruit_NeoPixel strip = Adafruit_NeoPixel(Pixels, PIN, NEO_GRB + NEO_KHZ800);
 #endif
 
+#ifdef EXT_NEOPIXEL_PIN
+  Adafruit_NeoPixel ext_strip = Adafruit_NeoPixel(EXT_NEOPIXEL_NUM, EXT_NEOPIXEL_PIN, NEO_GRB + NEO_KHZ800);
+#endif
+
 uint32_t currentTime  = 0;
 
 // PWM Brightness Control
@@ -302,6 +306,20 @@ void setup()
     #endif
   #endif
 
+  // Adafruit Reverse TFT Feather: enable the FET-gated power rail BEFORE
+  // initializing the TFT / onboard NeoPixel. (Generic FQBN = no variant auto-init.)
+  #ifdef TFT_I2C_POWER
+    pinMode(TFT_I2C_POWER, OUTPUT);
+    digitalWrite(TFT_I2C_POWER, HIGH);
+  #endif
+  #ifdef NEOPIXEL_POWER
+    pinMode(NEOPIXEL_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER, HIGH);
+  #endif
+  #if defined(TFT_I2C_POWER) || defined(NEOPIXEL_POWER)
+    delay(10); // let the rail settle
+  #endif
+
   #ifdef HAS_SCREEN
     display_obj.RunSetup();
     display_obj.tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -385,6 +403,10 @@ void setup()
     stickc_led.RunSetup();
   #elif defined(HAS_NEOPIXEL_LED)
     led_obj.RunSetup();
+  #endif
+
+  #ifdef EXT_NEOPIXEL_PIN
+    led_obj.extSetup();
   #endif
 
   #ifdef HAS_GPS

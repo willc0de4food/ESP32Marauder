@@ -25,6 +25,7 @@
   //#define MARAUDER_DEV_BOARD_PRO
   //#define XIAO_ESP32_S3
   //#define MARAUDER_REV_FEATHER
+  //#define MARAUDER_REV_FEATHER_S3
   //#define MARAUDER_CYD_MICRO // 2432S028
   //#define MARAUDER_CYD_2USB // Another 2432S028 but it has tWo UsBs OoOoOoO
   //#define MARAUDER_CYD_GUITION // ESP32-2432S024 GUITION
@@ -73,6 +74,8 @@
     #define HARDWARE_NAME "Marauder v7.1"
   #elif defined(MARAUDER_REV_FEATHER)
     #define HARDWARE_NAME "Adafruit Feather ESP32-S2 Reverse TFT"
+  #elif defined(MARAUDER_REV_FEATHER_S3)
+    #define HARDWARE_NAME "Adafruit Feather ESP32-S3 Reverse TFT"
   #elif defined(MARAUDER_V4)
     #define HARDWARE_NAME "Marauder v4"
   #elif defined(MARAUDER_V6)
@@ -118,6 +121,14 @@
  //// BOARD FEATURES
   #if defined(DUAL_MINI_C5)
     #define MARAUDER_MINI_V3
+  #endif
+
+  // ESP32-S3 Reverse TFT Feather: pin-identical to the S2 Reverse TFT, so
+  // inherit the entire MARAUDER_REV_FEATHER config and code-paths, then add
+  // the S3-only deltas below (PSRAM, power rails, SD_CS, external strip).
+  #if defined(MARAUDER_REV_FEATHER_S3)
+    #define MARAUDER_REV_FEATHER
+    #define HAS_PSRAM
   #endif
 
   #if defined(MARAUDER_M5STICKC) || defined(MARAUDER_M5STICKCP2)
@@ -1873,7 +1884,11 @@
       #define TFT_RST 41
       #define TFT_BL 45
       //#define TOUCH_CS 21
-      #define SD_CS 4
+      #ifdef MARAUDER_REV_FEATHER_S3
+        #define SD_CS 10
+      #else
+        #define SD_CS 4
+      #endif
 
       #define SCREEN_BUFFER
 
@@ -1934,6 +1949,14 @@
       #define GREENBUTTON_H FRAME_H
     
       #define STATUSBAR_COLOR 0x4A49
+    #endif
+
+    #ifdef MARAUDER_REV_FEATHER_S3
+      // FET-gated rail for the TFT + onboard NeoPixel + STEMMA/I2C. Generic-FQBN
+      // builds don't run Adafruit's variant init, so these are driven HIGH in
+      // setup() (esp32_marauder.ino). Without it the screen and onboard pixel stay dark.
+      #define TFT_I2C_POWER 7
+      #define NEOPIXEL_POWER 21
     #endif
 
     #ifdef MARAUDER_MINI_V3
@@ -2344,7 +2367,11 @@
     #endif
 
     #ifdef MARAUDER_REV_FEATHER
-      #define SD_CS 5
+      #ifdef MARAUDER_REV_FEATHER_S3
+        #define SD_CS 10
+      #else
+        #define SD_CS 5
+      #endif
     #endif
 
     #ifdef MARAUDER_M5STICKC
@@ -2525,7 +2552,13 @@
     #else
       #define PIN 25
     #endif
-  
+
+    #ifdef MARAUDER_REV_FEATHER_S3
+      // External WS2812B strip (arc-reactor). Onboard debug pixel stays on PIN 33 above.
+      #define EXT_NEOPIXEL_PIN 5
+      #define EXT_NEOPIXEL_NUM 1   // TODO: set to actual strip length
+    #endif
+
   #endif
   //// END NEOPIXEL STUFF
 

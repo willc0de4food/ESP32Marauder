@@ -65,6 +65,23 @@ void LedInterface::setColor(int r, int g, int b) {
   #endif
 }
 
+void LedInterface::extSetup() {
+  #ifdef EXT_NEOPIXEL_PIN
+    ext_strip.begin();
+    ext_strip.setBrightness(50);
+    ext_strip.clear();
+    ext_strip.show();
+  #endif
+}
+
+void LedInterface::extSetColor(int r, int g, int b) {
+  #ifdef EXT_NEOPIXEL_PIN
+    for (uint16_t i = 0; i < ext_strip.numPixels(); i++)
+      ext_strip.setPixelColor(i, ext_strip.Color(r, g, b));
+    ext_strip.show();
+  #endif
+}
+
 void LedInterface::sniffLed() {
   this->setColor(0, 0, 255);
 }

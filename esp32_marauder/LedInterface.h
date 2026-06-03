@@ -18,6 +18,10 @@ extern Settings settings_obj;
   extern Adafruit_NeoPixel strip;
 #endif
 
+#ifdef EXT_NEOPIXEL_PIN
+  extern Adafruit_NeoPixel ext_strip;
+#endif
+
 class LedInterface {
 
   private:
@@ -45,6 +49,9 @@ class LedInterface {
     void setMode(uint8_t);
     void setColor(int r, int g, int b);
     uint8_t getMode();
+
+    void extSetup();
+    void extSetColor(int r, int g, int b);
     
   
 };
