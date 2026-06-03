@@ -320,6 +320,13 @@ void setup()
     delay(10); // let the rail settle
   #endif
 
+  // TEMP: drive the external strip solid blue once at boot (low brightness for
+  // current safety with 60 LEDs). Normal Marauder operation continues after.
+  #ifdef EXT_NEOPIXEL_PIN
+    led_obj.extSetup();
+    led_obj.extSetColor(0, 0, 255);
+  #endif
+
   #ifdef HAS_SCREEN
     display_obj.RunSetup();
     display_obj.tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -342,36 +349,6 @@ void setup()
       display_obj.tft.drawCentreString(display_obj.version_number, TFT_HEIGHT/2, TFT_WIDTH * 0.66, 1);
     #endif
   #endif
-
-  // TEMP pin scanner: the LED plug is wrapped and we don't know which GPIO the
-  // data lead is on. Cycle candidate (broken-out, non-conflicting) GPIOs, show
-  // each on the TFT, and drive the strip bright white. Whichever GPIO is on
-  // screen when the strip lights is the real data pin. Never returns.
-  #ifdef EXT_NEOPIXEL_PIN
-    backlightOn();
-    {
-      const int scanPins[] = {5, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 8, 38, 39};
-      ext_strip.begin();
-      ext_strip.setBrightness(120);
-      for (;;) {
-        for (uint8_t i = 0; i < sizeof(scanPins) / sizeof(scanPins[0]); i++) {
-          display_obj.tft.fillScreen(TFT_BLACK);
-          display_obj.tft.drawCentreString("Data pin?", TFT_WIDTH / 2, TFT_HEIGHT * 0.2, 2);
-          display_obj.tft.drawCentreString("GPIO " + String(scanPins[i]), TFT_WIDTH / 2, TFT_HEIGHT * 0.45, 4);
-          Serial.printf("[PIN-SCAN] driving GPIO %d white\n", scanPins[i]);
-          ext_strip.setPin(scanPins[i]);
-          for (int p = 0; p < EXT_NEOPIXEL_NUM; p++)
-            ext_strip.setPixelColor(p, ext_strip.Color(255, 255, 255));
-          ext_strip.show();
-          delay(1800);
-          ext_strip.clear();
-          ext_strip.show();
-          delay(250);
-        }
-      }
-    }
-  #endif
-
 
   backlightOn(); // Need this
 
