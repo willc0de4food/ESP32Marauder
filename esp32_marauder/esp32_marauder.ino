@@ -320,11 +320,9 @@ void setup()
     delay(10); // let the rail settle
   #endif
 
-  // TEMP: drive the external strip solid blue once at boot (low brightness for
-  // current safety with 60 LEDs). Normal Marauder operation continues after.
+  // TEMP: init the external strip; loop() keeps it continuously lit (~15%).
   #ifdef EXT_NEOPIXEL_PIN
     led_obj.extSetup();
-    led_obj.extSetColor(0, 0, 255);
   #endif
 
   #ifdef HAS_SCREEN
@@ -445,6 +443,16 @@ void setup()
 void loop()
 {
   currentTime = millis();
+
+  // TEMP bring-up: keep the external strip continuously lit blue at ~15%.
+  #ifdef EXT_NEOPIXEL_PIN
+    static uint32_t extLedTime = 0;
+    if (currentTime - extLedTime >= 250) {
+      extLedTime = currentTime;
+      led_obj.extSetColor(0, 0, 255);
+    }
+  #endif
+
   bool mini = false;
 
   #ifdef SCREEN_BUFFER

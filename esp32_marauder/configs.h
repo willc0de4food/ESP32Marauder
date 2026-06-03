@@ -2556,7 +2556,7 @@
     #ifdef MARAUDER_REV_FEATHER_S3
       // External WS2812B strip (arc-reactor). Onboard debug pixel stays on PIN 33 above.
       #define EXT_NEOPIXEL_PIN 5
-      #define EXT_NEOPIXEL_NUM 60  // actual arc-reactor strip length
+      #define EXT_NEOPIXEL_NUM 24  // actual arc-reactor strip length
     #endif
 
   #endif
