@@ -1889,9 +1889,18 @@ bool WiFiScan::scanning() {
 // Function to prepare to run a specific scan
 void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color) {  
   this->initWiFi(scan_mode);
-  if (scan_mode == WIFI_SCAN_OFF)
+  if (scan_mode == WIFI_SCAN_OFF) {
+    #ifdef HAS_ACT_LED
+      digitalWrite(ACT_LED_PIN, LOW);
+    #endif
     StopScan(scan_mode);
-  else if (scan_mode == WIFI_SCAN_PROBE)
+  } else {
+    #ifdef HAS_ACT_LED
+      digitalWrite(ACT_LED_PIN, HIGH);
+    #endif
+  }
+
+  if (scan_mode == WIFI_SCAN_PROBE)
     RunProbeScan(scan_mode, color);
   else if ((scan_mode == WIFI_SCAN_SAE_COMMIT) || (scan_mode == WIFI_ATTACK_SAE_COMMIT))
     RunSAEScan(scan_mode, color);
@@ -2041,6 +2050,11 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color) {
     RunPortScanAll(scan_mode, color);
   else if (scan_mode == WIFI_SCAN_RDP)
     RunPortScanAll(scan_mode, color);
+  else {
+    #ifdef HAS_ACT_LED
+      digitalWrite(ACT_LED_PIN, LOW);
+    #endif
+  }
 
   this->currentScanMode = scan_mode;
 }
@@ -2114,13 +2128,13 @@ void WiFiScan::displayTargetFilter() {
   #endif
 }
 
-void WiFiScan::startWiFiAttacks(uint8_t scan_mode, uint16_t color, String title_string) {
+void WiFiScan::startWiFiAttacks(uint8_t scan_mode, uint16_t color, const char* title_string) {
   // Common wifi attack configurations
   #ifdef HAS_SCREEN
     this->setupScanDisplayArea(TFT_BLACK, color);
     #ifdef HAS_FULL_SCREEN
       display_obj.tft.fillRect(0,16,TFT_WIDTH,16, color);
-      display_obj.tft.drawCentreString((String)title_string,TFT_WIDTH / 2,16,2);
+      display_obj.tft.drawCentreString(String(title_string),TFT_WIDTH / 2,16,2);
     #endif
     #ifdef HAS_ILI9341
       display_obj.touchToExit();
@@ -3198,8 +3212,24 @@ void WiFiScan::RunLoadAPList() {
       } else {
         memset(ap.bssid, 0, 6); // Zero BSSID if missing
       }
+      Serial.println("Got: " + ap.essid);
 
       ap.stations = new LinkedList<uint16_t>();
+
+      JsonArray ap_stations = obj["stations"].as<JsonArray>();
+      uint16_t staions_index = stations->size();
+      uint16_t ap_index = access_points->size() +1;
+      for (JsonVariant station_mac : ap_stations) {
+        Station sta;
+          Serial.printf("  -> %s\n", station_mac.as<const char*>());
+          convertMacStringToUint8(station_mac, sta.mac);
+          sta.selected = false;
+          sta.packets = 0;
+          sta.ap = ap_index;
+          stations->add(sta);
+          ap.stations->add(staions_index++);
+      }
+
       ap.rssi     = obj.containsKey("rssi")   ? obj["rssi"].as<int>()          : -127;
       ap.packets  = obj.containsKey("packet") ? obj["packet"].as<uint32_t>()   : 0;
       ap.sec      = obj.containsKey("sec")    ? obj["sec"].as<uint8_t>()       : 0;
@@ -3211,7 +3241,6 @@ void WiFiScan::RunLoadAPList() {
       ap.has_msg_4 = false;
 
       access_points->add(ap);
-      Serial.println("Got: " + ap.essid);
     }
 
     file.close();
@@ -3253,6 +3282,14 @@ void WiFiScan::RunSaveAPList(bool save_as) {
         jsonAp["sec"] = ap.sec;
         jsonAp["wps"] = ap.wps;
         jsonAp["man"] = ap.man;
+        JsonArray sta_array = jsonAp["stations"].to<JsonArray>();
+
+        uint16_t sta_inx;
+        for (int j = 0; j < ap.stations->size(); j++) {
+          uint8_t *sta_mac = stations->get(ap.stations->get(j)).mac;
+          sta_array.add(macToString(sta_mac));
+
+        }
       }
 
       String jsonString;
@@ -6022,7 +6059,7 @@ uint8_t WiFiScan::getSecurityType(const uint8_t* beacon, uint16_t len) {
     return WIFI_SECURITY_OPEN;
 }
 
-String WiFiScan::processPwnagotchiBeacon(const uint8_t* frame, int length) {
+void WiFiScan::processPwnagotchiBeacon(const uint8_t* frame, int length) {
   int jsonStartIndex = 36;
   int jsonEndIndex = length;
 
@@ -6030,20 +6067,20 @@ String WiFiScan::processPwnagotchiBeacon(const uint8_t* frame, int length) {
   while (jsonEndIndex > jsonStartIndex && frame[jsonEndIndex - 1] != '}') jsonEndIndex--;
 
   if (jsonStartIndex >= jsonEndIndex)
-    return "";
+    return;
 
   String jsonString = String((char*)frame + jsonStartIndex, jsonEndIndex - jsonStartIndex);
 
   size_t jsonCapacity = jsonString.length() * 1.5;
 
   if (jsonCapacity > ESP.getFreeHeap())
-    return "";
+    return;
 
   StaticJsonDocument<2048> doc;
   DeserializationError error = deserializeJson(doc, jsonString);
 
   if (error)
-    return "";
+    return;
 
   if (doc.containsKey("name") && doc.containsKey("pwnd_tot")) {
     const char* name = doc["name"];
@@ -6069,11 +6106,7 @@ String WiFiScan::processPwnagotchiBeacon(const uint8_t* frame, int length) {
 
       display_obj.display_buffer->add(String("       Ver: ") + ver + "                   ");
     #endif
-
-    return String("Name: ") + name + ", \nPwnd: " + String(pwnd_tot) + ", \nVer: " + ver;
   } 
-  else
-    return "";
 }
 
 // PINEAPPLE LOGIC

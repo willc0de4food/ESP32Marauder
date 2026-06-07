@@ -1066,7 +1066,7 @@ void MenuFunctions::updateStatusBar()
     #endif
 
     #ifdef HAS_MINI_SCREEN
-      display_obj.tft.drawString("CH: " + (String)wifi_scan_obj.old_channel, TFT_WIDTH/4, 0, 1);
+      display_obj.tft.drawString("CH:" + (String)wifi_scan_obj.old_channel, TFT_WIDTH/4, 0, 1);
     #endif
   }
 
@@ -1085,11 +1085,7 @@ void MenuFunctions::updateStatusBar()
   #endif
 
   #ifdef HAS_MINI_SCREEN
-    #ifndef HAS_PSRAM
-      display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
-    #else
-      display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%" + " P:" + String(getPSRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
-    #endif
+    display_obj.tft.drawString(String(getDRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
   #endif
   }
 
@@ -1250,7 +1246,7 @@ void MenuFunctions::drawStatusBar()
   #endif
 
   #ifdef HAS_MINI_SCREEN
-    display_obj.tft.drawString("CH: " + (String)wifi_scan_obj.old_channel, TFT_WIDTH/4, 0, 1);
+    display_obj.tft.drawString("CH:" + (String)wifi_scan_obj.old_channel, TFT_WIDTH/4, 0, 1);
   #endif
 
   // RAM Stuff
@@ -1258,29 +1254,16 @@ void MenuFunctions::drawStatusBar()
   wifi_scan_obj.old_free_ram = wifi_scan_obj.free_ram;
   display_obj.tft.fillRect(100, 0, 60, STATUS_BAR_WIDTH, STATUSBAR_COLOR);
   #ifdef HAS_FULL_SCREEN
-    //display_obj.tft.setCursor(100, 0);
-    //display_obj.tft.setFreeFont(2);
-    //display_obj.tft.print("D:" + String(getDRAMUsagePercent()) + "%");
     #ifndef HAS_PSRAM
       display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%", 100, 0, 2);
     #else
-      //display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%" + " P:" + String(getPSRAMUsagePercent()) + "%", 100, 0, 1);
       display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%", 100, 0, 1);
       display_obj.tft.drawString("P:" + String(getPSRAMUsagePercent()) + "%", 100, 8, 1);
     #endif
-    //display_obj.tft.drawString((String)wifi_scan_obj.free_ram + "B", 100, 0, 2);
   #endif
 
   #ifdef HAS_MINI_SCREEN
-    //display_obj.tft.setCursor(TFT_WIDTH/1.75, 0);
-    //display_obj.tft.setFreeFont(1);
-    //display_obj.tft.print("D:" + String(getDRAMUsagePercent()) + "%");
-    #ifndef HAS_PSRAM
-      display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
-    #else
-      display_obj.tft.drawString("D:" + String(getDRAMUsagePercent()) + "%" + " P:" + String(getPSRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
-    #endif
-    //display_obj.tft.drawString((String)wifi_scan_obj.free_ram + "B", TFT_WIDTH/1.75, 0, 1);
+    display_obj.tft.drawString(String(getDRAMUsagePercent()) + "%", TFT_WIDTH/1.75, 0, 1);
   #endif
 
 
@@ -1415,7 +1398,7 @@ const char* MenuFunctions::callSetting(const char* key) {
   return "";
 }
 
-void MenuFunctions::displaySetting(String key, Menu* menu, int index) {
+/*void MenuFunctions::displaySetting(String key, Menu* menu, int index) {
   specSettingMenu.name = key;
 
   bool setting_value = settings_obj.loadSetting<bool>(key);
@@ -1443,6 +1426,34 @@ void MenuFunctions::displaySetting(String key, Menu* menu, int index) {
   // Put local copy back into menu
   menu->list->set(index, node);
     
+}*/
+
+void MenuFunctions::displaySetting(const char* key, Menu* menu, int index) {
+  specSettingMenu.name = String(key);
+
+  bool setting_value = settings_obj.loadSetting<bool>(key);
+
+  // Make a local copy of menu node
+  MenuNode node = menu->list->get(index);
+
+  display_obj.tft.setTextWrap(false);
+  display_obj.tft.setFreeFont(NULL);
+  display_obj.tft.setCursor(0, 100);
+  display_obj.tft.setTextSize(1);
+
+  // Set local copy value
+  if (!setting_value) {
+    display_obj.tft.setTextColor(TFT_RED);
+    display_obj.tft.println(F(text_table1[4]));
+    node.selected = false;
+  } else {
+    display_obj.tft.setTextColor(TFT_GREEN);
+    display_obj.tft.println(F(text_table1[5]));
+    node.selected = true;
+  }
+
+  // Put local copy back into menu
+  menu->list->set(index, node);
 }
 
 #if defined(MARAUDER_CARDPUTER) || defined(MARAUDER_CARDPUTER_ADV)
@@ -2999,16 +3010,16 @@ void MenuFunctions::RunSetup()
     const char* type = this->callSetting(settingName.c_str());
     if (type && strcmp(type, "bool") == 0) {
       this->addNodes(&settingsMenu, settingName, TFTLIGHTGREY, NULL, SETTINGS, [this, i, settingName]() {
-          settings_obj.toggleSetting(settingName);
+          settings_obj.toggleSetting(settingName.c_str());
           this->callSetting(settingName.c_str());
           this->changeMenu(&specSettingMenu, true);
-          this->displaySetting(settingName, &settingsMenu, i + 1);
+          this->displaySetting(settingName.c_str(), &settingsMenu, i + 1);
           wifi_scan_obj.force_pmkid = settings_obj.loadSetting<bool>(text_table4[5]);
           wifi_scan_obj.force_probe = settings_obj.loadSetting<bool>(text_table4[6]);
           wifi_scan_obj.save_pcap = settings_obj.loadSetting<bool>(text_table4[7]);
           wifi_scan_obj.ep_deauth = settings_obj.loadSetting<bool>("EPDeauth");
           wifi_scan_obj.channel_hop = settings_obj.loadSetting<bool>("ChanHop");
-      }, settings_obj.loadSetting<bool>(settingName));
+      }, settings_obj.loadSetting<bool>(settingName.c_str()));
     }
   }
 
@@ -3482,18 +3493,31 @@ void MenuFunctions::buildSDFileMenu(bool update) {
   });
 
   if (!update) {
+    this->addNodes(&sdDeleteMenu, "Delete Selected", TFTORANGE, NULL, 0, [this]() {
+      for (int x = 0; x < sd_obj.sd_files->size(); x++) {
+        if (current_menu->list->get(x + 2).selected) {
+          if (sd_obj.removeFile("/" + sd_obj.sd_files->get(x))) {
+            Serial.println("Deleted /" + sd_obj.sd_files->get(x));
+            display_obj.clearScreen();
+            display_obj.tft.setTextWrap(false);
+            display_obj.tft.setCursor(0, SCREEN_HEIGHT / 3);
+            display_obj.tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            display_obj.tft.println("Deleting /" + sd_obj.sd_files->get(x) + "...");
+          }
+        }
+      }
+      this->buildSDFileMenu();
+      this->changeMenu(&sdDeleteMenu, true);
+    });
+  }
+
+  if (!update) {
     for (int x = 0; x < sd_obj.sd_files->size(); x++) {
       this->addNodes(&sdDeleteMenu, sd_obj.sd_files->get(x), TFTCYAN, NULL, SD_UPDATE, [this, x]() {
-        if (sd_obj.removeFile("/" + sd_obj.sd_files->get(x))) {
-          Serial.println("Deleted /" + sd_obj.sd_files->get(x));
-          display_obj.clearScreen();
-          display_obj.tft.setTextWrap(false);
-          display_obj.tft.setCursor(0, SCREEN_HEIGHT / 3);
-          display_obj.tft.setTextColor(TFT_CYAN, TFT_BLACK);
-          display_obj.tft.println("Deleting /" + sd_obj.sd_files->get(x) + "...");
-          this->buildSDFileMenu();
-          this->changeMenu(&sdDeleteMenu, true);
-        }
+        // Change selection status of menu node
+        MenuNode new_node = current_menu->list->get(x + 2);
+        new_node.selected = !current_menu->list->get(x + 2).selected;
+        current_menu->list->set(x + 2, new_node);
       });
     }
   }
@@ -3633,7 +3657,7 @@ void MenuFunctions::drawGraphSmall(uint8_t *values) {
       }
 
       if (values[targ_val] * this->_graph_scale <= GRAPH_VERT_LIM) {
-        display_obj.tft.fillRect(x_coord, SCREEN_HEIGHT / 2 + 1, bar_width, SCREEN_HEIGHT / 2 + 1, TFT_BLACK);
+        display_obj.tft.fillRect(x_coord, SCREEN_HEIGHT / 2 + 1, bar_width + 3, SCREEN_HEIGHT / 2 + 1, TFT_BLACK);
         display_obj.tft.fillRect(x_coord, SCREEN_HEIGHT - (values[targ_val] * this->_graph_scale), bar_width, values[targ_val] * this->_graph_scale, TFT_CYAN);
       }
 
