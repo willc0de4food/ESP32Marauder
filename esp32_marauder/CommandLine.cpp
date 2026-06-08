@@ -983,36 +983,38 @@ void CommandLine::runCommand(String input) {
     //// Bluetooth scan/attack commands
     // Bluetooth scan
     if (cmd_args.get(0) == BT_SNIFF_CMD) {
-      #ifdef HAS_BT
-        int bt_type_sw = this->argSearch(&cmd_args, "-t");
+      int bt_type_sw = this->argSearch(&cmd_args, "-t");
+      String bt_type = (bt_type_sw != -1) ? cmd_args.get(bt_type_sw + 1) : "";
+      bt_type.toLowerCase();
 
-        // Specifying type of bluetooth sniff
-        if (bt_type_sw != -1) {
-          String bt_type = cmd_args.get(bt_type_sw + 1);
-
-          bt_type.toLowerCase();
-
-          // Airtag sniff
-          if (bt_type == "airtag") {
-            this->startScanFromCLI(BT_SCAN_AIRTAG, TFT_WHITE, "Airtag sniff");
+      // Flock detection has a WiFi side (probe sniff + OUI capture) that runs
+      // on boards without a BT radio, so it is not gated behind HAS_BT.
+      if (bt_type == "flock") {
+        this->startScanFromCLI(BT_SCAN_FLOCK, TFT_ORANGE, "Flock sniff");
+      }
+      else {
+        #ifdef HAS_BT
+          // Specifying type of bluetooth sniff
+          if (bt_type_sw != -1) {
+            // Airtag sniff
+            if (bt_type == "airtag") {
+              this->startScanFromCLI(BT_SCAN_AIRTAG, TFT_WHITE, "Airtag sniff");
+            }
+            else if (bt_type == "flipper") {
+              this->startScanFromCLI(BT_SCAN_FLIPPER, TFT_ORANGE, "Flipper sniff");
+            }
+            else if (bt_type == "meta") {
+              this->startScanFromCLI(BT_SCAN_RAYBAN, TFT_ORANGE, "Meta sniff");
+            }
           }
-          else if (bt_type == "flipper") {
-            this->startScanFromCLI(BT_SCAN_FLIPPER, TFT_ORANGE, "Flipper sniff");
+          // General bluetooth sniff
+          else {
+            this->startScanFromCLI(BT_SCAN_ALL, TFT_GREEN, "Bluetooth scan");
           }
-          else if (bt_type == "flock") {
-            this->startScanFromCLI(BT_SCAN_FLOCK, TFT_ORANGE, "Flock sniff");
-          }
-          else if (bt_type == "meta") {
-            this->startScanFromCLI(BT_SCAN_RAYBAN, TFT_ORANGE, "Meta sniff");
-          }
-        }
-        // General bluetooth sniff
-        else {
-          this->startScanFromCLI(BT_SCAN_ALL, TFT_GREEN, "Bluetooth scan");
-        }
-      #else
-        Serial.println(F("Bluetooth not supported"));
-      #endif
+        #else
+          Serial.println(F("Bluetooth not supported"));
+        #endif
+      }
     }
     else if (cmd_args.get(0) == BT_SPOOFAT_CMD) {
       int at_sw = this->argSearch(&cmd_args, "-t");

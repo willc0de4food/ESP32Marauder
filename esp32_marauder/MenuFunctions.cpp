@@ -1928,6 +1928,12 @@ void MenuFunctions::RunSetup()
     wifi_scan_obj.gps_log_for_next_sniff = true;
     wifi_scan_obj.StartScan(WIFI_SCAN_SAE_COMMIT, TFT_GREEN);
   });
+  this->addNodes(&wifiSnifferGpsMenu, "Flock", TFTORANGE, NULL, FLOCK, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.gps_log_for_next_sniff = true;
+    wifi_scan_obj.StartScan(BT_SCAN_FLOCK, TFT_ORANGE);
+  });
   #endif
 
   // Build Wardriving menu
