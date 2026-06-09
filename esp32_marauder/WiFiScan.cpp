@@ -7279,15 +7279,11 @@ void WiFiScan::beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type
           do_write = true;
 
         if (do_write) {
+          String flock_line = "[FLOCK] " + (String)snifferPacket->rx_ctrl.rssi +
+                              " " + (String)addr + " -> " + probe_req_essid;
           #ifdef HAS_SCREEN
             display_string.concat(MAGENTA_KEY);
-            display_string.concat((String)snifferPacket->rx_ctrl.rssi);
-            display_string.concat(" ");
-            display_string.concat(addr);
-            display_string.concat(" -> ");
-            display_string.concat(probe_req_essid);
-
-            int temp_len = display_string.length();
+            display_string.concat(flock_line);
 
             for (int i = 0; i < 40; i++)
             {
@@ -7301,7 +7297,7 @@ void WiFiScan::beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type
             }
           #endif
 
-          Serial.println(display_string);
+          Serial.println(flock_line);
 
           buffer_obj.append(snifferPacket, len);
           return;
@@ -7318,15 +7314,11 @@ void WiFiScan::beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type
           for (int i = 0; i < sizeof(flock_ssid)/sizeof(wifi_scan_obj.flock_ssid[0]); i++) {
             if (strcasestr(essid.c_str(), wifi_scan_obj.flock_ssid[i])) {
 
+              String flock_line = "[FLOCK] " + (String)snifferPacket->rx_ctrl.rssi +
+                                  " " + (String)addr + " -> " + essid;
               #ifdef HAS_SCREEN
                 display_string.concat(GREEN_KEY);
-                display_string.concat((String)snifferPacket->rx_ctrl.rssi);
-                display_string.concat(" ");
-                display_string.concat(addr);
-                display_string.concat(" -> ");
-                display_string.concat(essid);
-
-                int temp_len = display_string.length();
+                display_string.concat(flock_line);
 
                 for (int i = 0; i < 40; i++)
                 {
@@ -7340,7 +7332,7 @@ void WiFiScan::beaconSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type
                 }
               #endif
 
-              Serial.println(display_string);
+              Serial.println(flock_line);
 
               buffer_obj.append(snifferPacket, len);
               break;
