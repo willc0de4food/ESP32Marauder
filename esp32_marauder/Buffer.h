@@ -32,6 +32,7 @@ class Buffer {
     void append(String log);
     void save();
     String getFileName();
+    bool getIsPPI() { return is_ppi; }
   private:
     void createFile(String name, bool is_pcap, bool is_gpx = false);
     void open(bool is_pcap);

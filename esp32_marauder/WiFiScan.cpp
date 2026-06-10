@@ -9845,6 +9845,21 @@ uint16_t WiFiScan::rssiToColor(int8_t rssi) {
 // Function for updating scan status
 void WiFiScan::main(uint32_t currentTime)
 {
+  // A capture with no GPS fix silently logs the -180 sentinel for every frame
+  // (a positionless pcap), so push fix state to the companion to surface it.
+  #ifdef HAS_GPS
+    // scanning() guards against is_ppi lingering true after StopScan (only
+    // pcapOpen() clears it), which would otherwise spam [GPS] lines while idle.
+    if (buffer_obj.getIsPPI() && this->scanning() &&
+        (currentTime - this->last_gps_status_time >= 2000)) {
+      this->last_gps_status_time = currentTime;
+      if (gps_obj.getGpsModuleStatus() && gps_obj.getFixStatus())
+        Serial.println("[GPS] FIX sats=" + gps_obj.getNumSatsString());
+      else
+        Serial.println("[GPS] NOFIX sats=" + gps_obj.getNumSatsString());
+    }
+  #endif
+
   // WiFi operations
   if ((currentScanMode == WIFI_SCAN_PROBE) ||
   (currentScanMode == WIFI_SCAN_AP) ||
