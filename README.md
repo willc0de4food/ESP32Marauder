@@ -35,6 +35,25 @@ behavior is unchanged.
 - **GPS altitude encoding fix** — corrects the fixed-point conversion factor
   for the PPI altitude sub-field so Wireshark renders altitudes in meters
   rather than a scaled-up nonsense value (cherry-pick of upstream fix).
+- **Flock-camera capture wired into the GPS path.** Upstream's Flock detection
+  (SSID `Flock` + a known-OUI list, `BT_SCAN_FLOCK`) is reachable from this
+  fork's GPS plumbing: a **"Sniff + GPS → Flock"** device menu entry and a
+  `sniffbt -t flock -g` CLI path produce a Flock-filtered DLT-192 PPI pcap
+  (every captured frame GPS- and RSSI-tagged). The `sniffbt -t flock` handler
+  is also pulled out from behind `#ifdef HAS_BT` so its WiFi side (probe-sniff +
+  OUI capture) runs on Bluetooth-less boards like the Flipper Dev Board
+  (ESP32-S2).
+- **`[FLOCK]` serial detection lines.** During a Flock sniff, each matching
+  frame prints `[FLOCK] <rssi> <mac> -> <ssid>` over serial. Upstream only built
+  that line under `HAS_SCREEN`, so headless boards emitted an empty string; this
+  fork sends it on the serial/companion path too, so the Flipper console shows
+  hits live.
+- **`[GPS] FIX/NOFIX sats=N` serial status.** Every 2 s during a PPI capture the
+  firmware reports GPS fix state over serial so the companion can alert on a lost
+  fix. Without it, a no-fix capture silently logs the DLT-192 `-180` no-fix
+  sentinel for every frame and the whole pcap is positionless. Announced once on
+  fix-acquire, then repeated only while there is no fix (so a healthy capture
+  isn't spammed).
 
 ## Companion app
 
@@ -44,13 +63,20 @@ The companion-app side of this work lives at
 `wifi_marauder_companion/` subdirectory). It adds:
 
 - A **"Sniff + GPS"** top-level menu entry pre-wired with the `-g` flag for
-  beacon / probe / raw / pmkid / deauth / bt / mactrack variants.
+  beacon / probe / raw / pmkid / deauth / bt / mactrack / flock variants.
 - **Channel-locked sniff entries** (`raw ch1`, `raw ch6`, `raw ch11`) that
   send a multi-line UART command (`channel -s N\nsniffraw -g`) so the radio
   locks to one 2.4 GHz channel for duty-cycled-device hunting.
 - A **`raw hop`** entry that re-enables the firmware's `ChanHop` setting
   (`settings -s ChanHop enable\nsniffraw -g`) — easy way to return to
   channel-hopping after using one of the locked entries.
+- **`flock ch1` / `flock hop`** entries that apply the same lock/hop choice to
+  the Flock sniff (`sniffbt -t flock -g`), which otherwise inherits whatever
+  `ChanHop` state was last set — `ch1` for a known camera, `hop` to also find
+  cameras on ch6/ch11.
+- A **GPS no-fix alert**: the companion parses the firmware's `[GPS] FIX/NOFIX`
+  lines and buzzes/vibrates + blinks the Flipper LED when a GPS capture has no
+  fix, so you don't unknowingly record a positionless pcap.
 
 ## Why
 
