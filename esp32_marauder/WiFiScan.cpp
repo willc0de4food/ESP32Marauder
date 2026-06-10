@@ -9853,10 +9853,16 @@ void WiFiScan::main(uint32_t currentTime)
     if (buffer_obj.getIsPPI() && this->scanning() &&
         (currentTime - this->last_gps_status_time >= 2000)) {
       this->last_gps_status_time = currentTime;
-      if (gps_obj.getGpsModuleStatus() && gps_obj.getFixStatus())
-        Serial.println("[GPS] FIX sats=" + gps_obj.getNumSatsString());
-      else
-        Serial.println("[GPS] NOFIX sats=" + gps_obj.getNumSatsString());
+      bool fix = gps_obj.getGpsModuleStatus() && gps_obj.getFixStatus();
+      // Nag every 2s while there's no fix; announce a regained fix once, then
+      // stay quiet so a healthy capture's console isn't spammed with FIX lines.
+      if (!fix || fix != this->last_gps_fix) {
+        if (fix)
+          Serial.println("[GPS] FIX sats=" + gps_obj.getNumSatsString());
+        else
+          Serial.println("[GPS] NOFIX sats=" + gps_obj.getNumSatsString());
+      }
+      this->last_gps_fix = fix;
     }
   #endif
 

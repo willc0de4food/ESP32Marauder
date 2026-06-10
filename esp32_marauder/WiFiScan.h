@@ -328,6 +328,7 @@ class WiFiScan
     uint32_t last_ui_update = 0;
     uint32_t last_sour_apple_update = 0;
     uint32_t last_gps_status_time = 0;
+    bool last_gps_fix = false;
     bool run_setup = true;
     void initWiFi(uint8_t scan_mode);
     uint8_t bluetoothScanTime = 5;
