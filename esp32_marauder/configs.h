@@ -2557,6 +2557,12 @@
       // External WS2812B strip (arc-reactor). Onboard debug pixel stays on PIN 33 above.
       #define EXT_NEOPIXEL_PIN 5
       #define EXT_NEOPIXEL_NUM 24  // actual arc-reactor strip length
+      // Full white at this many pixels draws ~1.4 A, well past what any Feather
+      // rail can source; only raise once the strip has its own supply.
+      #define EXT_NEOPIXEL_BRIGHTNESS 24
+      #define EXT_NEOPIXEL_R 235
+      #define EXT_NEOPIXEL_G 245
+      #define EXT_NEOPIXEL_B 255
     #endif
 
   #endif

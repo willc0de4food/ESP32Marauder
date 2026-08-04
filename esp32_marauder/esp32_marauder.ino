@@ -320,7 +320,7 @@ void setup()
     delay(10); // let the rail settle
   #endif
 
-  // TEMP: init the external strip; loop() keeps it continuously lit (~15%).
+  // Before the TFT/SD init, so a later hang can't be misread as a wiring fault.
   #ifdef EXT_NEOPIXEL_PIN
     led_obj.extSetup();
   #endif
@@ -444,13 +444,12 @@ void loop()
 {
   currentTime = millis();
 
-  // TEMP bring-up: keep the external strip continuously lit, arc-reactor cool
-  // white (near-balanced RGB, slight blue lean); brightness set in extSetup().
+  // WS2812Bs latch, but repaint anyway: the strip's supply may come up late.
   #ifdef EXT_NEOPIXEL_PIN
     static uint32_t extLedTime = 0;
     if (currentTime - extLedTime >= 250) {
       extLedTime = currentTime;
-      led_obj.extSetColor(235, 245, 255);
+      led_obj.extSetColor(EXT_NEOPIXEL_R, EXT_NEOPIXEL_G, EXT_NEOPIXEL_B);
     }
   #endif
 
