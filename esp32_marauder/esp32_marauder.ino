@@ -444,12 +444,37 @@ void loop()
 {
   currentTime = millis();
 
-  // WS2812Bs latch, but repaint anyway: the strip's supply may come up late.
+  // Scale the colour rather than calling setBrightness(), which re-quantises the
+  // stored pixel values on every call and drifts; the cap set in extSetup()
+  // remains the hard current limit.
   #ifdef EXT_NEOPIXEL_PIN
     static uint32_t extLedTime = 0;
-    if (currentTime - extLedTime >= 250) {
+    static uint32_t extLastFrames = 0;
+    static uint8_t extGlow = 0;
+    const uint16_t EXT_GLOW_FLOOR = 40;  // never fully dark
+    if (currentTime - extLedTime >= 100) {
       extLedTime = currentTime;
-      led_obj.extSetColor(EXT_NEOPIXEL_R, EXT_NEOPIXEL_G, EXT_NEOPIXEL_B);
+      uint32_t frames = wifi_scan_obj.mgmt_frames + wifi_scan_obj.data_frames;
+      // StartScan zeroes these counters, so guard the wrap rather than flaring.
+      uint32_t hit = frames > extLastFrames ? (frames - extLastFrames) * 40 : 0;
+      extLastFrames = frames;
+      if (hit > 255) hit = 255;
+      uint8_t decayed = extGlow > 24 ? extGlow - 24 : 0;
+      extGlow = hit > decayed ? (uint8_t)hit : decayed;
+      uint16_t scale = EXT_GLOW_FLOOR + ((uint16_t)extGlow * (255 - EXT_GLOW_FLOOR)) / 255;
+      led_obj.extSetColor((EXT_NEOPIXEL_R * scale) / 255, (EXT_NEOPIXEL_G * scale) / 255,
+                          (EXT_NEOPIXEL_B * scale) / 255);
+    }
+  #endif
+
+  // Deferred out of setup() deliberately: starting a scan there panics with a
+  // stack canary overflow. Run from loop() instead, after a few seconds' margin
+  // for init to settle.
+  #ifdef AUTO_START_RAW_SNIFF
+    static bool auto_sniff_started = false;
+    if (!auto_sniff_started && currentTime > 3000) {
+      auto_sniff_started = true;
+      wifi_scan_obj.StartScan(WIFI_SCAN_RAW_CAPTURE, TFT_WHITE);
     }
   #endif
 

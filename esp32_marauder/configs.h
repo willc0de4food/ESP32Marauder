@@ -1961,6 +1961,8 @@
       // TFT_eSPI claims the default SPI bus during display init, before initSD();
       // a later bare SPI.begin() can't reassign pins, so SD needs its own bus.
       #define HAS_SEPARATE_SD
+
+      #define AUTO_START_RAW_SNIFF
     #endif
 
     #ifdef MARAUDER_MINI_V3
