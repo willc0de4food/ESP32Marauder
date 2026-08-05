@@ -228,6 +228,55 @@ uint32_t currentTime  = 0;
   SDInterface sd_obj = SDInterface(&sharedSPI, SD_CS);
 #endif
 
+#ifdef HAS_BADGE_RETRIEVE
+  extern AsyncWebServer server;  // owned by EvilPortal.cpp
+  bool badge_serving = false;
+
+  void badgeRetrieveStart() {
+    wifi_scan_obj.StartScan(WIFI_SCAN_OFF);  // frees the radio from monitor mode
+
+    static bool routes_registered = false;
+    if (!routes_registered) {  // AsyncWebServer can't unregister, so only ever once
+      routes_registered = true;
+      server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+        File root = SD.open("/");
+        if (!root || !root.isDirectory()) {  // card is unreliable; don't fault the server task
+          request->send(200, "text/html", F("<h2>Marauder badge</h2><p>No SD card mounted.</p>"));
+          return;
+        }
+        String html = F("<!doctype html><meta name=viewport content='width=device-width'>"
+                        "<h2>Marauder badge</h2><ul>");
+        for (File f = root.openNextFile(); f; f = root.openNextFile()) {
+          if (f.isDirectory()) continue;
+          String name = f.name();
+          if (!name.startsWith("/")) name = "/" + name;
+          html += "<li><a href=\"/dl" + name + "\">" + name + "</a> " + f.size() + " bytes</li>";
+        }
+        html += F("</ul>");
+        request->send(200, "text/html", html);
+      });
+      server.serveStatic("/dl", SD, "/");
+    }
+
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(BADGE_AP_SSID, BADGE_AP_PASS);
+    server.begin();
+    badge_serving = true;
+    Serial.print(F("Serving captures on "));
+    Serial.print(BADGE_AP_SSID);
+    Serial.print(F(" at http://"));
+    Serial.println(WiFi.softAPIP());
+  }
+
+  void badgeRetrieveStop() {
+    server.end();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    badge_serving = false;
+    wifi_scan_obj.StartScan(WIFI_SCAN_RAW_CAPTURE, TFT_WHITE);
+  }
+#endif
+
 void setup()
 {
   randomSeed(esp_random());
@@ -451,7 +500,9 @@ void loop()
     static uint32_t extLedTime = 0;
     static uint32_t extLastFrames = 0;
     static uint8_t extGlow = 0;
-    const uint16_t EXT_GLOW_FLOOR = 40;  // never fully dark
+    // Idle floor. Multiplied by EXT_NEOPIXEL_BRIGHTNESS, 128 lands near 9% of
+    // full white -- the level that was confirmed visible on the ring.
+    const uint16_t EXT_GLOW_FLOOR = 128;
     if (currentTime - extLedTime >= 100) {
       extLedTime = currentTime;
       uint32_t frames = wifi_scan_obj.mgmt_frames + wifi_scan_obj.data_frames;
@@ -462,8 +513,28 @@ void loop()
       uint8_t decayed = extGlow > 24 ? extGlow - 24 : 0;
       extGlow = hit > decayed ? (uint8_t)hit : decayed;
       uint16_t scale = EXT_GLOW_FLOOR + ((uint16_t)extGlow * (255 - EXT_GLOW_FLOOR)) / 255;
-      led_obj.extSetColor((EXT_NEOPIXEL_R * scale) / 255, (EXT_NEOPIXEL_G * scale) / 255,
-                          (EXT_NEOPIXEL_B * scale) / 255);
+      uint8_t r = (EXT_NEOPIXEL_R * scale) / 255;
+      uint8_t g = (EXT_NEOPIXEL_G * scale) / 255;
+      uint8_t b = (EXT_NEOPIXEL_B * scale) / 255;
+      #ifdef HAS_BADGE_RETRIEVE
+        if (badge_serving) {  // amber is the only "not capturing" signal on a dead screen
+          r = 255;
+          g = 110;
+          b = 0;
+        }
+      #endif
+      led_obj.extSetColor(r, g, b);
+    }
+  #endif
+
+  #ifdef HAS_BADGE_RETRIEVE
+    // All three are accepted since the dead screen leaves the menu nothing to do
+    // with them. Must stay above menu_function_obj: justPressed() eats the edge.
+    if (d_btn.justPressed() || c_btn.justPressed() || u_btn.justPressed()) {
+      if (badge_serving)
+        badgeRetrieveStop();
+      else
+        badgeRetrieveStart();
     }
   #endif
 
