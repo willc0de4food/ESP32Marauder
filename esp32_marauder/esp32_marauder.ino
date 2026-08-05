@@ -271,7 +271,8 @@ uint32_t currentTime  = 0;
   void badgeRetrieveStop() {
     server.end();
     WiFi.softAPdisconnect(true);
-    WiFi.mode(WIFI_OFF);
+    // No WiFi.mode(WIFI_OFF) here: RunRawScan re-inits the driver itself, and
+    // deinitialising first only adds a state transition that could fail to recover.
     badge_serving = false;
     wifi_scan_obj.StartScan(WIFI_SCAN_RAW_CAPTURE, TFT_WHITE);
   }
