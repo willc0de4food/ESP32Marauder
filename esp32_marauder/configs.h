@@ -1957,6 +1957,10 @@
       // setup() (esp32_marauder.ino). Without it the screen and onboard pixel stay dark.
       #define TFT_I2C_POWER 7
       #define NEOPIXEL_POWER 21
+
+      // TFT_eSPI claims the default SPI bus during display init, before initSD();
+      // a later bare SPI.begin() can't reassign pins, so SD needs its own bus.
+      #define HAS_SEPARATE_SD
     #endif
 
     #ifdef MARAUDER_MINI_V3
@@ -2878,6 +2882,12 @@
       #define SD_MISO TFT_MISO
       #define SD_MOSI TFT_MOSI
       #define SD_SCK  TFT_SCLK
+    #endif
+
+    #ifdef MARAUDER_REV_FEATHER_S3
+      #define SD_MISO 13
+      #define SD_MOSI 11
+      #define SD_SCK  12
     #endif
   #endif
   //// END STUPID CYD STUFF
