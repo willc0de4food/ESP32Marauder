@@ -7,30 +7,37 @@
 // ---------------------------------------------------------------------------
 void Settings::_buildCache() {
   DynamicJsonDocument json(JSON_SETTING_SIZE);
+
   if (deserializeJson(json, this->json_settings_string)) {
     Serial.println(F("_buildCache: could not parse json"));
     return;
   }
 
   for (int i = 0; i < (int)json["Settings"].size(); i++) {
-    String name = json["Settings"][i]["name"].as<String>();
+    const char* name = json["Settings"][i]["name"] | "";
 
-    if (name == "ForcePMKID")
+    if (strcmp(name, "ForcePMKID") == 0)
       _cache.ForcePMKID = json["Settings"][i]["value"].as<bool>();
-    else if (name == "ForceProbe")
+    else if (strcmp(name, "ForceProbe") == 0)
       _cache.ForceProbe = json["Settings"][i]["value"].as<bool>();
-    else if (name == "SavePCAP")
+    else if (strcmp(name, "SavePCAP") == 0)
       _cache.SavePCAP = json["Settings"][i]["value"].as<bool>();
-    else if (name == "EnableLED")
+    else if (strcmp(name, "EnableLED") == 0)
       _cache.EnableLED = json["Settings"][i]["value"].as<bool>();
-    else if (name == "EPDeauth")
+    else if (strcmp(name, "EPDeauth") == 0)
       _cache.EPDeauth = json["Settings"][i]["value"].as<bool>();
-    else if (name == "ChanHop")
+    else if (strcmp(name, "ChanHop") == 0)
       _cache.ChanHop = json["Settings"][i]["value"].as<bool>();
-    else if (name == "ClientSSID")
+    else if (strcmp(name, "ClientSSID") == 0)
       _cache.ClientSSID = json["Settings"][i]["value"].as<String>();
-    else if (name == "ClientPW")
+    else if (strcmp(name, "ClientPW") == 0)
       _cache.ClientPW = json["Settings"][i]["value"].as<String>();
+    else if (strcmp(name, "wu") == 0)
+      _cache.wu = json["Settings"][i]["value"].as<String>();
+    else if (strcmp(name, "wt") == 0)
+      _cache.wt = json["Settings"][i]["value"].as<String>();
+    else if (strcmp(name, WDG_KEY_NAME) == 0)
+      _cache.wdg_key = json["Settings"][i]["value"].as<String>();
   }
 }
 
@@ -106,9 +113,14 @@ template <> int Settings::loadSetting<int>(const char* key) {
 template <> String Settings::loadSetting<String>(const char* key) {
   if (strcmp(key, "ClientSSID") == 0)
     return _cache.ClientSSID;
-
   if (strcmp(key, "ClientPW") == 0)
     return _cache.ClientPW;
+    if (strcmp(key, "wu") == 0)
+    return _cache.wu;
+  if (strcmp(key, "wt") == 0)
+    return _cache.wt;
+  if (strcmp(key, WDG_KEY_NAME) == 0)
+    return _cache.wdg_key;
 
   // Unknown String key: fall back to JSON so the setting can be auto-created.
   DynamicJsonDocument json(JSON_SETTING_SIZE);
@@ -301,6 +313,12 @@ template <> bool Settings::saveSetting<bool>(const char* key, String value) {
         _cache.ClientSSID = value;
       else if (strcmp(key, "ClientPW") == 0)
         _cache.ClientPW = value;
+      else if (strcmp(key, "wu") == 0)
+        _cache.wu = value;
+      else if (strcmp(key, "wt") == 0)
+        _cache.wt = value;
+      else if (strcmp(key, WDG_KEY_NAME) == 0)
+        _cache.wdg_key = value;
 
       this->printJsonSettings(settings_string);
 
@@ -449,6 +467,24 @@ bool Settings::createDefaultSettings(fs::FS &fs, bool spec, uint8_t index, const
     jsonBuffer["Settings"][7]["value"] = "";
     jsonBuffer["Settings"][7]["range"]["min"] = "";
     jsonBuffer["Settings"][7]["range"]["max"] = "";
+
+    jsonBuffer["Settings"][8]["name"] = "wu";
+    jsonBuffer["Settings"][8]["type"] = "String";
+    jsonBuffer["Settings"][8]["value"] = "";
+    jsonBuffer["Settings"][8]["range"]["min"] = "";
+    jsonBuffer["Settings"][8]["range"]["max"] = "";
+
+    jsonBuffer["Settings"][9]["name"] = "wt";
+    jsonBuffer["Settings"][9]["type"] = "String";
+    jsonBuffer["Settings"][9]["value"] = "";
+    jsonBuffer["Settings"][9]["range"]["min"] = "";
+    jsonBuffer["Settings"][9]["range"]["max"] = "";
+
+    jsonBuffer["Settings"][10]["name"] = WDG_KEY_NAME;
+    jsonBuffer["Settings"][10]["type"] = "String";
+    jsonBuffer["Settings"][10]["value"] = "";
+    jsonBuffer["Settings"][10]["range"]["min"] = "";
+    jsonBuffer["Settings"][10]["range"]["max"] = "";
 
     serializeJson(jsonBuffer, settingsFile);
     serializeJson(jsonBuffer, settings_string);

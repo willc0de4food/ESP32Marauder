@@ -14,12 +14,12 @@
   #include <NimBLEDevice.h> // 1.3.8, 2.3.2
 #endif
 
-#ifdef HAS_IDF_3
+/*#ifdef HAS_IDF_3
   extern "C" {
     #include "esp_netif.h"
     #include "esp_netif_net_stack.h"
   }
-#endif
+#endif*/
 
 //#include <WiFi.h>
 #include <ESP32Ping.h>
@@ -66,6 +66,12 @@
   #include "stickcLED.h"
 #elif defined(HAS_NEOPIXEL_LED)
   #include "LedInterface.h"
+#endif
+
+#ifdef HAS_DIRECT_UPLOAD
+  #include <WiFiClientSecure.h>
+  #include <HTTPClient.h>
+  #include "mbedtls/sha256.h"
 #endif
 
 #define bad_list_length 3
@@ -157,6 +163,9 @@
 #define BT_SCAN_RAYBAN 81
 #define BT_ATTACK_APPLE_JUICE 82
 #define WIFI_SCAN_DISPLAY_AP_INFO 83
+#define BT_SCAN_FOX_HUNT 84
+#define BT_FINDMY_SOUND 85
+#define BT_ATTACK_FINDMY_LIVE 86
 
 #define WIFI_ATTACK_FUNNY_BEACON 99 
 
@@ -208,6 +217,11 @@
 #define CLEAR_PINE  5
 #define CLEAR_MULTI 6
 #define CLEAR_SSID  7
+#define CLEAR_BLE   8
+
+#define WIGLE_UPLOAD 0
+#define WDG_UPLOAD   1
+#define BOTH_UPLOAD  2
 
 extern EvilPortal evil_portal_obj;
 
@@ -241,6 +255,62 @@ esp_err_t esp_wifi_80211_tx(wifi_interface_t ifx, const void *buffer, int len, b
 #define VALID_ENTRY 1
 #define TOMBSTONE_ENTRY 2
 
+#ifdef HAS_BT
+
+#define IS_AIRTAG 0
+#define IS_FMNA   1
+#define IS_DULT   2
+static constexpr uint8_t AIRTAG_BEEP_COMMAND = 0xAF;
+
+static const NimBLEUUID AIRTAG_SERVICE_UUID(
+    "7dfc9000-7d1c-4951-86aa-8d9728f8d66c"
+);
+
+static const NimBLEUUID AIRTAG_CHARACTERISTIC_UUID(
+    "7dfc9001-7d1c-4951-86aa-8d9728f8d66c"
+);
+
+static const NimBLEUUID FMNA_SERVICE_UUID(
+    "0000fd44-0000-1000-8000-00805f9b34fb"
+);
+
+static const NimBLEUUID FMNA_SOUND_CHARACTERISTIC_UUID(
+    "4f860003-943b-49ef-bed4-2f730304427a"
+);
+
+static const NimBLEUUID DULT_SERVICE_UUID(
+    "15190001-12f4-c226-88ed-2ac5579f2a85"
+);
+
+static const NimBLEUUID DULT_SOUND_CHARACTERISTIC_UUID(
+    "8e0c0001-1d68-fb92-bf61-48377421680e"
+);
+
+static const uint8_t FMNA_START_SOUND_COMMAND[] = {
+    0x01, 0x00, 0x03
+};
+
+static const uint8_t FMNA_STOP_SOUND_COMMAND[] = {
+    0x01, 0x01, 0x03
+};
+
+static const uint8_t DULT_START_SOUND_COMMAND[] = {
+    0x00, 0x03
+};
+
+static const uint8_t DULT_STOP_SOUND_COMMAND[] = {
+    0x01, 0x03
+};
+
+static NimBLEAddress pendingAddress(
+    "00:00:00:00:00:00",
+    BLE_ADDR_PUBLIC
+);
+
+bool connectionPending = false;
+bool operationInProgress = false;
+#endif
+
 #pragma pack(push, 1)
 struct MacEntry {
   uint8_t  mac[6];
@@ -264,11 +334,25 @@ struct AirTag {
     bool selected;
     int8_t rssi;
     uint32_t last_seen;
+    bool is_airtag   = false;
+    bool is_fmna     = false;
+    bool is_dult     = false;
+    bool connectable = true;
+    #ifdef HAS_BT
+    NimBLEAddress device_address;
+    #endif
 };
 
 struct Flipper {
   String mac;
   String name;
+};
+
+struct BleDevice {
+  uint8_t  mac[6];
+  String   name;
+  bool     selected = false;
+  int      rssi     = -128;
 };
 
 #ifdef HAS_PSRAM
@@ -300,6 +384,10 @@ class WiFiScan
     // Settings
     uint mac_history_cursor = 0;
     uint8_t channel_hop_delay = 1;
+
+    #ifdef HAS_DIRECT_UPLOAD
+      WiFiClientSecure *client = new WiFiClientSecure();
+    #endif
   
     int x_pos; //position along the graph x axis
     float y_pos_x; //current graph y axis position of X value
@@ -336,6 +424,9 @@ class WiFiScan
     const wifi_promiscuous_filter_t filt = {.filter_mask=WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA};
     #ifdef HAS_BT
       NimBLEScan* pBLEScan;
+    #endif
+    #ifdef HAS_NIMBLE_2
+      NimBLEClient* nimbleClient;
     #endif
 
     const char* rick_roll[8] = {
@@ -587,6 +678,26 @@ class WiFiScan
       NimBLEAdvertisementData GetUniversalAdvertisementData(EBLEPayloadType type);
     #endif
 
+    #ifdef HAS_NIMBLE_2
+      int connectAndProcessTracker(NimBLEAddress& address);
+      bool backendFindMySound(NimBLEAddress& address, bool gui = false);
+      bool sendAirtagSoundCommand(NimBLEClient* currentClient);
+      bool sendFmnaSoundCommand(NimBLEClient* currentClient);
+      bool sendDultSoundCommand(NimBLEClient* currentClient);
+      bool enableTrackerResponses(NimBLERemoteCharacteristic* characteristic);
+      void createNimbleClient();
+      void initializeFindMyScan();
+    #endif
+
+    bool wigleUpload(String filePath);
+    bool wdgwarsUpload(String filePath);
+    void writeSidecar(String filePath, String service);
+    bool sidecarExists(String filePath, String service); 
+    #ifdef HAS_SCREEN
+      void drawUploadProgress(const char* service, uint8_t percent, bool waiting = false);
+    #endif
+
+    void runFoxHunt(uint32_t currentTime);
     void throwThatShitInACircle();
     void displayTargetFilter();
     void displayTransmitRate();
@@ -643,6 +754,7 @@ class WiFiScan
     void broadcastCustomBeacon(uint32_t current_time, ssid custom_ssid, bool for_camera = false);
     void broadcastCustomBeacon(uint32_t current_time, AccessPoint custom_ssid, int scan_mode);
     void broadcastSetSSID(uint32_t current_time, const char* ESSID, uint8_t chan = 0, bool legit = false);
+    void executeFindMyLive(uint32_t current_time);
     void RunAPScan(uint8_t scan_mode, uint16_t color);
     void RunGPSNmea();
     void RunPwnScan(uint8_t scan_mode, uint16_t color);
@@ -657,6 +769,7 @@ class WiFiScan
     void RunPacketMonitor(uint8_t scan_mode, uint16_t color);
     void RunBluetoothScan(uint8_t scan_mode, uint16_t color);
     void RunSourApple(uint8_t scan_mode, uint16_t color);
+    void RunFindMyLive(uint8_t scan_mode, uint16_t color);
     void RunSwiftpairSpam(uint8_t scan_mode, uint16_t color);
     void RunEvilPortal(uint8_t scan_mode, uint16_t color);
     void RunPingScan(uint8_t scan_mode, uint16_t color);
@@ -859,10 +972,12 @@ class WiFiScan
 
     wifi_config_t ap_config;
 
+    bool uploadFile(String filePath, bool retry = false, uint8_t upload_type = WIGLE_UPLOAD);
     String checkEmptyProbe(String essid);
     bool checkFlockOUI(const uint8_t mac[6]);
     bool startWiFi(String ssid, String password, bool gui = true);
     bool isFlockCamera(const uint8_t* payload, size_t len, const String& name, String* serial_out);
+    int seenBLEDevice(BleDevice ble_device);
     uint16_t rssiToColor(int8_t rssi);
     bool isMetaIdentifier(uint16_t id);
     bool isBlockedIdentifier(uint16_t id);
@@ -879,6 +994,9 @@ class WiFiScan
     void save_mac(unsigned char* mac);
     #ifdef HAS_BT
       void copyNimbleMac(const BLEAddress &addr, unsigned char out[6]);
+    #endif
+    #ifdef HAS_NIMBLE_2
+      bool executeFindMySound(bool gui = false);
     #endif
     bool filterActive();
     bool RunGPSInfo(bool tracker = false, bool display = true, bool poi = false);
@@ -930,9 +1048,9 @@ class WiFiScan
     // DLT-192 (PPI) link type with per-frame GPS tags. Reset to false inside
     // startPcap() so a subsequent non-GPS sniff doesn't accidentally inherit it.
     bool gps_log_for_next_sniff = false;
-    void startPcap(String file_name);
-    void startLog(String file_name);
-    void startGPX(String file_name);
+    void startPcap(const char* file_name);
+    void startLog(const char* file_name);
+    void startGPX(const char* file_name);
 
     static WiFiEventId_t eventId;
     static String lastClientMAC;
@@ -954,6 +1072,9 @@ class WiFiScan
     static void pineScanSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type); // Pineapple
     static int extractPineScanChannel(const uint8_t* payload, int len); // Pineapple
     static void multiSSIDSnifferCallback(void* buf, wifi_promiscuous_pkt_type_t type); // MultiSSID
+    #ifdef HAS_NIMBLE_2
+      static void trackerNotifyCallback(NimBLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify);
+    #endif
     static inline uint32_t hash_mac(const uint8_t mac[6]);
 };
 #endif

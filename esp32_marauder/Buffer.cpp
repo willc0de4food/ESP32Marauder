@@ -1,4 +1,5 @@
 #include "Buffer.h"
+#include "PcapHeader.h"
 #include "lang_var.h"
 #include "GpsInterface.h"
 
@@ -55,23 +56,23 @@ Buffer::Buffer(){
   bufB = (uint8_t*)malloc(BUF_SIZE);
 }
 
-void Buffer::createFile(String name, bool is_pcap, bool is_gpx){
+void Buffer::createFile(const char* name, bool is_pcap, bool is_gpx){
   int i=0;
   if (is_pcap) {
     do{
-      fileName = "/"+name+"_"+(String)i+".pcap";
+      fileName = "/"+String(name)+"_"+(String)i+".pcap";
       i++;
     } while(fs->exists(fileName));
   }
   else if ((!is_pcap) && (!is_gpx)) {
     do{
-      fileName = "/"+name+"_"+(String)i+".log";
+      fileName = "/"+String(name)+"_"+(String)i+".log";
       i++;
     } while(fs->exists(fileName));
   }
   else {
     do{
-      fileName = "/"+name+"_"+(String)i+".gpx";
+      fileName = "/"+String(name)+"_"+(String)i+".gpx";
       i++;
     } while(fs->exists(fileName));
   }
@@ -91,17 +92,22 @@ void Buffer::open(bool is_pcap){
   writing = true;
 
   if (is_pcap) {
-    // PPI captures need extra room in SNAP_LEN for the per-frame PPI header
-    // (32 bytes — see PPI_FRAME_OVERHEAD above).
-    uint32_t snap = is_ppi ? (SNAP_LEN + PPI_FRAME_OVERHEAD) : SNAP_LEN;
-    uint32_t dlt  = is_ppi ? PPI_DLT : 105;
-    write(uint32_t(0xa1b2c3d4)); // magic number
-    write(uint16_t(2)); // major version number
-    write(uint16_t(4)); // minor version number
-    write(int32_t(0)); // GMT to local correction
-    write(uint32_t(0)); // accuracy of timestamps
-    write(snap); // max length of captured packets, in octets
-    write(dlt); // data link type
+    if (is_ppi) {
+      // PPI captures need extra room in SNAP_LEN for the per-frame PPI header
+      // (32 bytes — see PPI_FRAME_OVERHEAD above) and use DLT 192, which the
+      // shared makePcapGlobalHeader() helper does not emit.
+      write(uint32_t(0xa1b2c3d4)); // magic number
+      write(uint16_t(2)); // major version number
+      write(uint16_t(4)); // minor version number
+      write(int32_t(0)); // GMT to local correction
+      write(uint32_t(0)); // accuracy of timestamps
+      write(uint32_t(SNAP_LEN + PPI_FRAME_OVERHEAD)); // max captured length
+      write(uint32_t(PPI_DLT)); // data link type
+    } else {
+      uint8_t header[marauder::kPcapGlobalHeaderSize];
+      marauder::makePcapGlobalHeader(SNAP_LEN, header);
+      write(header, sizeof(header));
+    }
   }
 }
 
@@ -109,7 +115,7 @@ String Buffer::getFileName() {
   return this->fileName;
 }
 
-void Buffer::openFile(String file_name, fs::FS* fs, bool serial, bool is_pcap, bool is_gpx) {
+void Buffer::openFile(const char* file_name, fs::FS* fs, bool serial, bool is_pcap, bool is_gpx) {
   bool save_pcap = settings_obj.loadSetting<bool>("SavePCAP");
   if (!save_pcap) {
     this->fs = NULL;
@@ -129,12 +135,12 @@ void Buffer::openFile(String file_name, fs::FS* fs, bool serial, bool is_pcap, b
   }
 }
 
-void Buffer::pcapOpen(String file_name, fs::FS* fs, bool serial) {
+void Buffer::pcapOpen(const char* file_name, fs::FS* fs, bool serial) {
   is_ppi = false;
   openFile(file_name, fs, serial, true);
 }
 
-void Buffer::pcapOpenPPI(String file_name, fs::FS* fs, bool serial) {
+void Buffer::pcapOpenPPI(const char* file_name, fs::FS* fs, bool serial) {
   is_ppi = true;
   openFile(file_name, fs, serial, true);
 }
@@ -206,11 +212,11 @@ void Buffer::writePpiHeader(uint32_t /*frame_len*/, int8_t rssi_dbm, uint8_t cha
   write(uint8_t((uint8_t)rssi_dbm));            // antenna signal (signed dBm)
 }
 
-void Buffer::logOpen(String file_name, fs::FS* fs, bool serial) {
+void Buffer::logOpen(const char* file_name, fs::FS* fs, bool serial) {
   openFile(file_name, fs, serial, false);
 }
 
-void Buffer::gpxOpen(String file_name, fs::FS* fs, bool serial) {
+void Buffer::gpxOpen(const char* file_name, fs::FS* fs, bool serial) {
   openFile(file_name, fs, serial, false, true);
 }
 

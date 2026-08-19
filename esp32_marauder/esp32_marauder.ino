@@ -1,6 +1,6 @@
 /* FLASH SETTINGS
 Board: LOLIN D32
-Flash Frequency: 80MHz
+ Frequency: 80MHz
 Partition Scheme: Minimal SPIFFS
 https://www.online-utility.org/image/convert/to/XBM
 */
@@ -90,10 +90,6 @@ CommandLine cli_obj;
 
 #if defined(HAS_SD) && !defined(HAS_C5_SD)
   SDInterface sd_obj;
-#endif
-
-#ifdef MARAUDER_M5STICKC
-  AXP192 axp192_obj;
 #endif
 
 #ifdef HAS_FLIPPER_LED
@@ -252,10 +248,6 @@ void setup()
     delay(100);
   #endif
 
-  #ifdef defined(MARAUDER_M5STICKC) && !defined(MARAUDER_M5STICKCP2)
-    axp192_obj.begin();
-  #endif
-
   #if defined(MARAUDER_M5STICKCP2) // Prevent StickCP2 from turning off when disconnect USB cable
     pinMode(POWER_HOLD_PIN, OUTPUT);
     digitalWrite(POWER_HOLD_PIN, HIGH);
@@ -347,7 +339,7 @@ void setup()
 
   settings_obj.begin();
 
-  const char* type = settings_obj.getSettingType("ChanHop");
+  const char* type = settings_obj.getSettingType("wu");
 
   if (type == nullptr || type[0] == '\0') {
     Serial.println(F("Current settings format not supported. Installing new default settings..."));
